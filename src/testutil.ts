@@ -3,6 +3,20 @@
 
 import { exportJWK, generateKeyPair } from "jose";
 import type { SigningKey } from "./token.ts";
+import type { Config } from "./config.ts";
+
+/** A ready-to-use Config for handler tests. */
+export async function testConfig(
+  overrides: Partial<Config> = {},
+): Promise<Config> {
+  return {
+    issuer: "https://sshid.test",
+    namespace: "sshid",
+    hmacSecret: new TextEncoder().encode("test-hmac-secret"),
+    signingKey: await testSigningKey(),
+    ...overrides,
+  };
+}
 
 /** An ephemeral RS256 signing key for tests. */
 export async function testSigningKey(kid = "test-key-1"): Promise<SigningKey> {
