@@ -1,4 +1,4 @@
-// Generate an RSA signing key as a private JWK for SSHID_SIGNING_JWK.
+// Generate an RSA signing key as a private JWK for POPOIDC_SIGNING_JWK.
 //   deno task keygen
 import { exportJWK, generateKeyPair } from "jose";
 

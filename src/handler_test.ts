@@ -5,19 +5,19 @@ import { testConfig } from "./testutil.ts";
 Deno.test("GET /.well-known/openid-configuration returns the discovery document", async () => {
   const handler = createHandler(await testConfig());
   const res = await handler(
-    new Request("https://sshid.test/.well-known/openid-configuration"),
+    new Request("https://popoidc.test/.well-known/openid-configuration"),
   );
   assertEquals(res.status, 200);
   const doc = await res.json();
-  assertEquals(doc.issuer, "https://sshid.test");
-  assertEquals(doc.jwks_uri, "https://sshid.test/.well-known/jwks.json");
+  assertEquals(doc.issuer, "https://popoidc.test");
+  assertEquals(doc.jwks_uri, "https://popoidc.test/.well-known/jwks.json");
   assertEquals(doc.id_token_signing_alg_values_supported, ["RS256"]);
 });
 
 Deno.test("GET /.well-known/jwks.json returns the public JWKS", async () => {
   const cfg = await testConfig();
   const res = await createHandler(cfg)(
-    new Request("https://sshid.test/.well-known/jwks.json"),
+    new Request("https://popoidc.test/.well-known/jwks.json"),
   );
   assertEquals(res.status, 200);
   const doc = await res.json();
@@ -30,7 +30,7 @@ Deno.test("GET /.well-known/jwks.json returns the public JWKS", async () => {
 
 Deno.test("an unknown route returns 404", async () => {
   const res = await createHandler(await testConfig())(
-    new Request("https://sshid.test/nope"),
+    new Request("https://popoidc.test/nope"),
   );
   assertEquals(res.status, 404);
 });

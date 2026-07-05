@@ -1,4 +1,4 @@
-# sshid
+# popoidc
 
 A public OIDC-compatible token issuer. Anyone who can prove possession of a
 supported private key can obtain a signed Token asserting control of the
@@ -29,7 +29,7 @@ over it. _Avoid_: nonce (it contains one, but is more), session.
 
 **Proof of Possession**: The response only the private key can produce for a
 given **Challenge**. Two methods: **Signing Proof** (sign the Challenge —
-signing-capable keys, via SSHSIG with namespace `sshid`) and **Decryption
+signing-capable keys, via SSHSIG with namespace `popoidc`) and **Decryption
 Proof** (decrypt a secret the Challenge encrypted to the public key —
 encryption-only keys like age). Required because public keys are public; without
 it a Token is worthless. _Avoid_: authentication, login.
@@ -84,7 +84,7 @@ if advertised) via coreos/go-oidc.
 ## Motivating scenario
 
 A devbox holds an ed25519 SSH Identity. It requests a Challenge for
-`aud=octo-sts.dev`, produces a Signing Proof (SSHSIG, namespace `sshid`), and
+`aud=octo-sts.dev`, produces a Signing Proof (SSHSIG, namespace `popoidc`), and
 redeems it for a Token (`sub` = Key Fingerprint). It posts the Token to
 octo-sts, which — per a Trust Policy naming that Fingerprint — returns a
 short-lived GitHub token the devbox uses for `git`. The Issuer never learns

@@ -14,7 +14,7 @@ import {
 const dec = new TextDecoder();
 
 function challengeUrl(key: string, aud: string, method?: string): string {
-  const u = new URL("https://sshid.test/challenge");
+  const u = new URL("https://popoidc.test/challenge");
   u.searchParams.set("key", key);
   u.searchParams.set("aud", aud);
   if (method) u.searchParams.set("method", method);
@@ -22,7 +22,7 @@ function challengeUrl(key: string, aud: string, method?: string): string {
 }
 
 function postToken(challenge: string): Request {
-  return new Request("https://sshid.test/token", {
+  return new Request("https://popoidc.test/token", {
     method: "POST",
     body: new URLSearchParams({ challenge }),
   });

@@ -8,13 +8,13 @@ import { genEd25519, sshSign, testConfig, withTempDir } from "./testutil.ts";
 const enc = new TextEncoder();
 
 function challengeUrl(key: string, aud: string): string {
-  return `https://sshid.test/challenge?key=${encodeURIComponent(key)}&aud=${
+  return `https://popoidc.test/challenge?key=${encodeURIComponent(key)}&aud=${
     encodeURIComponent(aud)
   }`;
 }
 
 function postToken(fields: Record<string, string>): Request {
-  return new Request("https://sshid.test/token", {
+  return new Request("https://popoidc.test/token", {
     method: "POST",
     body: new URLSearchParams(fields),
   });

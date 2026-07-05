@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# sshid pre-commit hook.
+# popoidc pre-commit hook.
 #
 #   1. Auto-formats the tree (deno fmt) and re-stages what was already staged.
 #   2. Blocks the commit on ANY deno fmt/lint/type/test problem.

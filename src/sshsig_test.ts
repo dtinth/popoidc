@@ -9,11 +9,11 @@ Deno.test("verifySshsig accepts a genuine signature and returns the signer key",
   await withTempDir(async (dir) => {
     const pubLine = await genEd25519(dir);
     const message = enc.encode(
-      "sshid challenge: aud=octo-sts.dev iat=1751731200",
+      "popoidc challenge: aud=octo-sts.dev iat=1751731200",
     );
-    const armored = await sshSign(dir, "id", "sshid", message);
+    const armored = await sshSign(dir, "id", "popoidc", message);
 
-    const { publicKeyWire } = verifySshsig(message, armored, "sshid");
+    const { publicKeyWire } = verifySshsig(message, armored, "popoidc");
 
     assertEquals(
       sshFingerprint(publicKeyWire),
@@ -26,15 +26,17 @@ Deno.test("verifySshsig rejects a signature made under a different namespace", a
   await withTempDir(async (dir) => {
     await genEd25519(dir);
     const message = enc.encode("payload");
-    const armored = await sshSign(dir, "id", "not-sshid", message);
-    assertThrows(() => verifySshsig(message, armored, "sshid"));
+    const armored = await sshSign(dir, "id", "not-popoidc", message);
+    assertThrows(() => verifySshsig(message, armored, "popoidc"));
   });
 });
 
 Deno.test("verifySshsig rejects a tampered message", async () => {
   await withTempDir(async (dir) => {
     await genEd25519(dir);
-    const armored = await sshSign(dir, "id", "sshid", enc.encode("original"));
-    assertThrows(() => verifySshsig(enc.encode("tampered"), armored, "sshid"));
+    const armored = await sshSign(dir, "id", "popoidc", enc.encode("original"));
+    assertThrows(() =>
+      verifySshsig(enc.encode("tampered"), armored, "popoidc")
+    );
   });
 });

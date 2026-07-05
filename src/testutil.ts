@@ -10,8 +10,8 @@ export async function testConfig(
   overrides: Partial<Config> = {},
 ): Promise<Config> {
   return {
-    issuer: "https://sshid.test",
-    namespace: "sshid",
+    issuer: "https://popoidc.test",
+    namespace: "popoidc",
     hmacSecret: new TextEncoder().encode("test-hmac-secret"),
     signingKey: await testSigningKey(),
     ...overrides,
@@ -90,7 +90,7 @@ export function ageDecrypt(
 export async function genEd25519(
   dir: string,
   name = "id",
-  comment = "test@sshid",
+  comment = "test@popoidc",
 ): Promise<string> {
   await sshKeygen(["-t", "ed25519", "-N", "", "-C", comment, "-f", name], dir);
   return (await Deno.readTextFile(`${dir}/${name}.pub`)).trim();

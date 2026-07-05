@@ -18,8 +18,8 @@ browser; keys live in CLIs):
    server-issued, stateless Challenge**: an HMAC (keyed by a server secret,
    never stored) binding `{aud, iat, public key}`.
 2. The holder returns a **Proof of Possession** over that Challenge — **Signing
-   Proof** (SSHSIG, namespace `sshid`) or **Decryption Proof** (decrypt a secret
-   the Challenge encrypted to the recipient).
+   Proof** (SSHSIG, namespace `popoidc`) or **Decryption Proof** (decrypt a
+   secret the Challenge encrypted to the recipient).
 3. `POST /token` re-verifies the HMAC + the proof + `iat` freshness (±60 s) and
    mints a 15-minute RS256 JWT whose `sub` is the key fingerprint.
 

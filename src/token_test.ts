@@ -7,7 +7,7 @@ Deno.test("mintToken issues an RS256 JWT that verifies against the JWKS", async 
   const sk = await testSigningKey("kid-a");
   const iat = 1_700_000_000;
   const token = await mintToken({
-    issuer: "https://sshid.example",
+    issuer: "https://popoidc.example",
     subject: "SHA256:abc",
     audience: "octo-sts.dev",
     key: "ssh-ed25519 AAAAC3Nz",
@@ -18,7 +18,7 @@ Deno.test("mintToken issues an RS256 JWT that verifies against the JWKS", async 
 
   const jwks = createLocalJWKSet(jwksDocument([sk]));
   const { payload, protectedHeader } = await jwtVerify(token, jwks, {
-    issuer: "https://sshid.example",
+    issuer: "https://popoidc.example",
     audience: "octo-sts.dev",
     currentDate: new Date((iat + 1) * 1000),
   });
@@ -34,9 +34,9 @@ Deno.test("mintToken issues an RS256 JWT that verifies against the JWKS", async 
 });
 
 Deno.test("discoveryDocument advertises issuer, jwks_uri and RS256", () => {
-  const d = discoveryDocument("https://sshid.example");
-  assertEquals(d.issuer, "https://sshid.example");
-  assertEquals(d.jwks_uri, "https://sshid.example/.well-known/jwks.json");
+  const d = discoveryDocument("https://popoidc.example");
+  assertEquals(d.issuer, "https://popoidc.example");
+  assertEquals(d.jwks_uri, "https://popoidc.example/.well-known/jwks.json");
   assertEquals(d.id_token_signing_alg_values_supported, ["RS256"]);
 });
 

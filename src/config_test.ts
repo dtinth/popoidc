@@ -13,15 +13,15 @@ async function privateJwkJson(kid = "k1"): Promise<string> {
 
 Deno.test("loadConfig builds a Config from env and derives a public-only JWK", async () => {
   const env = fakeEnv({
-    SSHID_ISSUER: "https://sshid.example/",
-    SSHID_SIGNING_JWK: await privateJwkJson("k1"),
-    SSHID_HMAC_SECRET: "supersecret",
+    POPOIDC_ISSUER: "https://popoidc.example/",
+    POPOIDC_SIGNING_JWK: await privateJwkJson("k1"),
+    POPOIDC_HMAC_SECRET: "supersecret",
   });
 
   const cfg = await loadConfig(env);
 
-  assertEquals(cfg.issuer, "https://sshid.example"); // trailing slash trimmed
-  assertEquals(cfg.namespace, "sshid");
+  assertEquals(cfg.issuer, "https://popoidc.example"); // trailing slash trimmed
+  assertEquals(cfg.namespace, "popoidc");
   assertEquals(cfg.signingKey.kid, "k1");
   assertEquals(cfg.signingKey.publicJwk.alg, "RS256");
   assert(
@@ -30,18 +30,18 @@ Deno.test("loadConfig builds a Config from env and derives a public-only JWK", a
   );
 });
 
-Deno.test("loadConfig requires SSHID_ISSUER", async () => {
+Deno.test("loadConfig requires POPOIDC_ISSUER", async () => {
   await assertRejects(() =>
-    loadConfig(fakeEnv({ SSHID_SIGNING_JWK: "{}", SSHID_HMAC_SECRET: "x" }))
+    loadConfig(fakeEnv({ POPOIDC_SIGNING_JWK: "{}", POPOIDC_HMAC_SECRET: "x" }))
   );
 });
 
 Deno.test("loadConfig rejects a JWK that is not an RSA private key with a kid", async () => {
   await assertRejects(() =>
     loadConfig(fakeEnv({
-      SSHID_ISSUER: "https://x",
-      SSHID_SIGNING_JWK: JSON.stringify({ kty: "oct", k: "aaaa" }),
-      SSHID_HMAC_SECRET: "x",
+      POPOIDC_ISSUER: "https://x",
+      POPOIDC_SIGNING_JWK: JSON.stringify({ kty: "oct", k: "aaaa" }),
+      POPOIDC_HMAC_SECRET: "x",
     }))
   );
 });

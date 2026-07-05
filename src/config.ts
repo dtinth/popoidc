@@ -26,26 +26,28 @@ function required(env: EnvSource, key: string): string {
 
 /**
  * Load configuration from the environment:
- *   SSHID_ISSUER      public issuer URL
- *   SSHID_SIGNING_JWK RSA private JWK (JSON) with a `kid`
- *   SSHID_HMAC_SECRET challenge HMAC secret
- *   SSHID_NAMESPACE   optional SSHSIG namespace (default "sshid")
+ *   POPOIDC_ISSUER      public issuer URL
+ *   POPOIDC_SIGNING_JWK RSA private JWK (JSON) with a `kid`
+ *   POPOIDC_HMAC_SECRET challenge HMAC secret
+ *   POPOIDC_NAMESPACE   optional SSHSIG namespace (default "popoidc")
  */
 export async function loadConfig(env: EnvSource = Deno.env): Promise<Config> {
-  const issuer = required(env, "SSHID_ISSUER").replace(/\/+$/, "");
+  const issuer = required(env, "POPOIDC_ISSUER").replace(/\/+$/, "");
   const hmacSecret = new TextEncoder().encode(
-    required(env, "SSHID_HMAC_SECRET"),
+    required(env, "POPOIDC_HMAC_SECRET"),
   );
-  const namespace = env.get("SSHID_NAMESPACE") ?? "sshid";
+  const namespace = env.get("POPOIDC_NAMESPACE") ?? "popoidc";
 
   let jwk: JWK & { kid?: string };
   try {
-    jwk = JSON.parse(required(env, "SSHID_SIGNING_JWK"));
+    jwk = JSON.parse(required(env, "POPOIDC_SIGNING_JWK"));
   } catch {
-    throw new Error("SSHID_SIGNING_JWK is not valid JSON");
+    throw new Error("POPOIDC_SIGNING_JWK is not valid JSON");
   }
   if (jwk.kty !== "RSA" || !jwk.kid || !jwk.d) {
-    throw new Error("SSHID_SIGNING_JWK must be an RSA private JWK with a kid");
+    throw new Error(
+      "POPOIDC_SIGNING_JWK must be an RSA private JWK with a kid",
+    );
   }
 
   const privateKey = await importJWK(jwk, "RS256") as CryptoKey;

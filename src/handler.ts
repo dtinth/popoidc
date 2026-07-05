@@ -141,7 +141,7 @@ async function handleToken(
   return text(jwt);
 }
 
-/** Build the sshid HTTP handler over a loaded Config. */
+/** Build the popoidc HTTP handler over a loaded Config. */
 export function createHandler(
   cfg: Config,
   opts: HandlerOptions = {},
