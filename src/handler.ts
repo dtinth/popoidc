@@ -162,6 +162,12 @@ export function createHandler(
   return async (req: Request): Promise<Response> => {
     const url = new URL(req.url);
     try {
+      if (req.method === "GET" && url.pathname === "/") {
+        return Response.redirect(
+          "https://github.com/dtinth/popoidc#readme",
+          302,
+        );
+      }
       if (
         req.method === "GET" &&
         url.pathname === "/.well-known/openid-configuration"

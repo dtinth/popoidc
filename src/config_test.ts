@@ -45,3 +45,13 @@ Deno.test("loadConfig rejects a JWK that is not an RSA private key with a kid", 
     }))
   );
 });
+
+Deno.test("loadConfig rejects a signing JWK that is not valid JSON", async () => {
+  await assertRejects(() =>
+    loadConfig(fakeEnv({
+      POPOIDC_ISSUER: "https://x",
+      POPOIDC_SIGNING_JWK: "not json {",
+      POPOIDC_HMAC_SECRET: "x",
+    }))
+  );
+});

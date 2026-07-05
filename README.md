@@ -16,10 +16,18 @@ human identity.
 The design and the decisions behind it live in [CONTEXT.md](./CONTEXT.md) and
 [docs/adr/](./docs/adr/).
 
+## Public instance
+
+A public instance runs at **<https://popoidc.spacet.me>**. Anyone may use it —
+but it is provided as-is, with **no SLA and no uptime guarantee**. Set
+`ISS=https://popoidc.spacet.me` in the examples below to try it, or self-host
+your own (see [Deploy](#deploy)).
+
 ## Endpoints
 
 | Method | Path                                                       | Purpose                                          |
 | ------ | ---------------------------------------------------------- | ------------------------------------------------ |
+| GET    | `/`                                                        | Redirects to this README                         |
 | GET    | `/.well-known/openid-configuration`                        | OIDC discovery (RS256)                           |
 | GET    | `/.well-known/jwks.json`                                   | Public signing keys                              |
 | GET    | `/challenge?key=<pubkey>&aud=<aud>[&method=sign\|decrypt]` | Issue a challenge                                |

@@ -1,4 +1,5 @@
 import { assertEquals, assertThrows } from "@std/assert";
+import { encodeBase64Url } from "@std/encoding/base64url";
 import {
   type Challenge,
   issueChallenge,
@@ -46,4 +47,30 @@ Deno.test("verifyChallenge rejects a challenge from the future", () => {
 Deno.test("verifyChallenge accepts within the freshness window", () => {
   const token = issueChallenge(base, secret);
   verifyChallenge(token, secret, base.iat + 59); // must not throw
+});
+
+Deno.test("verifyChallenge rejects a token with no dot", () => {
+  assertThrows(() => verifyChallenge("nodothere", secret, base.iat));
+});
+
+Deno.test("verifyChallenge rejects a token with an empty MAC", () => {
+  assertThrows(() => verifyChallenge("payload.", secret, base.iat));
+});
+
+Deno.test("verifyChallenge rejects a non-base64url MAC", () => {
+  const [payload] = issueChallenge(base, secret).split(".");
+  assertThrows(() => verifyChallenge(`${payload}.!!!`, secret, base.iat));
+});
+
+Deno.test("verifyChallenge rejects a MAC of the wrong length", () => {
+  const [payload] = issueChallenge(base, secret).split(".");
+  const shortMac = encodeBase64Url(new Uint8Array(8));
+  assertThrows(() =>
+    verifyChallenge(`${payload}.${shortMac}`, secret, base.iat)
+  );
+});
+
+Deno.test("verifyChallenge rejects a challenge with a non-numeric iat", () => {
+  const token = issueChallenge({ ...base, iat: NaN }, secret);
+  assertThrows(() => verifyChallenge(token, secret, base.iat));
 });

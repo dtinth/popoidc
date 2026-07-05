@@ -1,4 +1,4 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { encryptToRecipient } from "./agecrypt.ts";
 import {
   ageDecrypt,
@@ -29,4 +29,10 @@ Deno.test("encryptToRecipient round-trips through age (reimplemented ssh-ed25519
     // The ssh *private* key doubles as an age identity.
     assertEquals(dec.decode(await ageDecrypt(`${dir}/id`, armored)), secret);
   });
+});
+
+Deno.test("encryptToRecipient rejects an unsupported recipient", async () => {
+  await assertRejects(() =>
+    encryptToRecipient("not-a-recipient", enc.encode("x"))
+  );
 });
