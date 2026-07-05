@@ -9,6 +9,7 @@ import {
 } from "./challenge.ts";
 import { parseSshEd25519, sshFingerprint } from "./sshkey.ts";
 import { verifySshsig } from "./sshsig.ts";
+import { encryptToRecipient } from "./agecrypt.ts";
 
 export interface HandlerOptions {
   /** Injectable clock (unix seconds) for tests. */
@@ -44,8 +45,25 @@ function keyKind(key: string): "ssh-ed25519" | "age" {
   throw new HttpError(400, "unsupported key type");
 }
 
-/** GET /challenge — issue a challenge bound to {aud, iat, key}. */
-function handleChallenge(cfg: Config, url: URL, now: () => number): Response {
+/** The Token subject + key_type for a bound key. */
+function identityOf(key: string): { sub: string; keyType: string } {
+  if (key.startsWith("age1")) return { sub: key, keyType: "age" };
+  return {
+    sub: sshFingerprint(parseSshEd25519(key).wire),
+    keyType: "ssh-ed25519",
+  };
+}
+
+/**
+ * GET /challenge — issue a challenge bound to {aud, iat, key}.
+ * A signing key receives the challenge in the clear (to sign); a decryption key
+ * receives it encrypted to the key, so only the holder can recover it.
+ */
+async function handleChallenge(
+  cfg: Config,
+  url: URL,
+  now: () => number,
+): Promise<Response> {
   const key = url.searchParams.get("key");
   const aud = url.searchParams.get("aud");
   if (!key || !aud) {
@@ -68,11 +86,10 @@ function handleChallenge(cfg: Config, url: URL, now: () => number): Response {
     iat: now(),
     nonce: randomNonce(),
   };
+  const token = issueChallenge(challenge, cfg.hmacSecret);
 
-  if (method === "sign") {
-    return text(issueChallenge(challenge, cfg.hmacSecret));
-  }
-  throw new HttpError(400, "decrypt method not yet supported");
+  if (method === "sign") return text(token);
+  return text(await encryptToRecipient(key, enc.encode(token)));
 }
 
 /** POST /token — verify a challenge + its Proof of Possession, then mint a Token. */
@@ -92,6 +109,9 @@ async function handleToken(
     throw new HttpError(401, "invalid or expired challenge");
   }
 
+  // Signing Proof: the challenge was public, so require a signature over it that
+  // matches the bound key. Decryption Proof: recovering the MAC'd challenge (it
+  // was returned encrypted to the key) is itself the proof — nothing more needed.
   if (challenge.method === "sign") {
     const signature = body.get("signature");
     if (!signature) throw new HttpError(400, "signature is required");
@@ -106,19 +126,19 @@ async function handleToken(
     if (sshFingerprint(signer.publicKeyWire) !== sshFingerprint(bound.wire)) {
       throw new HttpError(401, "signature key does not match the challenge");
     }
-
-    const jwt = await mintToken({
-      issuer: cfg.issuer,
-      subject: sshFingerprint(bound.wire),
-      audience: challenge.aud,
-      key: challenge.key,
-      keyType: "ssh-ed25519",
-      signingKey: cfg.signingKey,
-      nowSeconds: now(),
-    });
-    return text(jwt);
   }
-  throw new HttpError(400, "decrypt method not yet supported");
+
+  const { sub, keyType } = identityOf(challenge.key);
+  const jwt = await mintToken({
+    issuer: cfg.issuer,
+    subject: sub,
+    audience: challenge.aud,
+    key: challenge.key,
+    keyType,
+    signingKey: cfg.signingKey,
+    nowSeconds: now(),
+  });
+  return text(jwt);
 }
 
 /** Build the sshid HTTP handler over a loaded Config. */
@@ -141,7 +161,7 @@ export function createHandler(
         return json(jwksDocument([cfg.signingKey]));
       }
       if (req.method === "GET" && url.pathname === "/challenge") {
-        return handleChallenge(cfg, url, now);
+        return await handleChallenge(cfg, url, now);
       }
       if (req.method === "POST" && url.pathname === "/token") {
         return await handleToken(cfg, req, now);
