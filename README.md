@@ -1,5 +1,8 @@
 # popoidc
 
+[![CI](https://github.com/dtinth/popoidc/actions/workflows/ci.yml/badge.svg)](https://github.com/dtinth/popoidc/actions/workflows/ci.yml)
+[![Coverage & test report](https://img.shields.io/badge/report-gh--pages-2563eb)](https://dtinth.github.io/popoidc/)
+
 A public, self-hosted **OIDC-compatible token issuer** that mints short-lived
 JWTs asserting _only_ that the bearer controls a given public key — "GitHub
 Actions OIDC, but the auth factor is a key you already own."

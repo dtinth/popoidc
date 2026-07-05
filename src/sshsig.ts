@@ -13,12 +13,6 @@ export interface SshsigResult {
   publicKeyWire: Uint8Array;
 }
 
-function bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
-
 /** Strip the `-----BEGIN/END SSH SIGNATURE-----` armor and base64-decode the body. */
 function dearmor(armored: string): Uint8Array {
   const m = armored.match(
@@ -46,7 +40,10 @@ export function verifySshsig(
 ): SshsigResult {
   const r = new Reader(dearmor(armored));
 
-  if (!bytesEqual(r.readBytes(6), MAGIC)) throw new Error("bad SSHSIG magic");
+  const magic = r.readBytes(6);
+  if (!MAGIC.every((b, i) => b === magic[i])) {
+    throw new Error("bad SSHSIG magic");
+  }
   const version = r.readUint32();
   if (version !== 1) throw new Error(`unsupported SSHSIG version ${version}`);
 

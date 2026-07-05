@@ -88,8 +88,19 @@ async function handleChallenge(
   };
   const token = issueChallenge(challenge, cfg.hmacSecret);
 
-  if (method === "sign") return text(token);
-  return text(await encryptToRecipient(key, enc.encode(token)));
+  if (method === "sign") {
+    try {
+      parseSshEd25519(key);
+    } catch {
+      throw new HttpError(400, "invalid ssh-ed25519 key");
+    }
+    return text(token);
+  }
+  try {
+    return text(await encryptToRecipient(key, enc.encode(token)));
+  } catch {
+    throw new HttpError(400, "invalid recipient key");
+  }
 }
 
 /** POST /token — verify a challenge + its Proof of Possession, then mint a Token. */
