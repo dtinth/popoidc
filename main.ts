@@ -1,18 +1,8 @@
-export function handler(req: Request): Response {
-  const url = new URL(req.url);
-
-  if (url.pathname === "/api") {
-    return Response.json({
-      message: "Hello, world!",
-      time: new Date().toISOString(),
-    });
-  }
-
-  return new Response("<h1>Welcome to Deno!</h1>", {
-    headers: { "content-type": "text/html" },
-  });
-}
+import { loadConfig } from "./src/config.ts";
+import { createHandler } from "./src/handler.ts";
 
 if (import.meta.main) {
-  Deno.serve(handler);
+  const cfg = await loadConfig();
+  const port = Number(Deno.env.get("PORT") ?? "8000");
+  Deno.serve({ port, hostname: "0.0.0.0" }, createHandler(cfg));
 }

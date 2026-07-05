@@ -1,0 +1,9 @@
+.git
+.githooks
+docs
+*_test.ts
+src/testutil.ts
+.env
+.env.*
+README.md
+CONTEXT.md
