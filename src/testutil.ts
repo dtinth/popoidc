@@ -1,6 +1,23 @@
 // Shared test helpers that drive the real `ssh-keygen` and `age` binaries, so
 // tests verify against ground-truth implementations rather than our own code.
 
+import { exportJWK, generateKeyPair } from "jose";
+import type { SigningKey } from "./token.ts";
+
+/** An ephemeral RS256 signing key for tests. */
+export async function testSigningKey(kid = "test-key-1"): Promise<SigningKey> {
+  const { publicKey, privateKey } = await generateKeyPair("RS256", {
+    extractable: true,
+  });
+  const publicJwk = {
+    ...(await exportJWK(publicKey)),
+    kid,
+    alg: "RS256",
+    use: "sig",
+  };
+  return { kid, privateKey, publicJwk };
+}
+
 async function run(
   bin: string,
   args: string[],
