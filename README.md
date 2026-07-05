@@ -25,13 +25,16 @@ your own (see [Deploy](#deploy)).
 
 ## Endpoints
 
-| Method | Path                                                       | Purpose                                          |
-| ------ | ---------------------------------------------------------- | ------------------------------------------------ |
-| GET    | `/`                                                        | Redirects to this README                         |
-| GET    | `/.well-known/openid-configuration`                        | OIDC discovery (RS256)                           |
-| GET    | `/.well-known/jwks.json`                                   | Public signing keys                              |
-| GET    | `/challenge?key=<pubkey>&aud=<aud>[&method=sign\|decrypt]` | Issue a challenge                                |
-| POST   | `/token`                                                   | Redeem a challenge + Proof of Possession → Token |
+| Method   | Path                                                         | Purpose                                          |
+| -------- | ------------------------------------------------------------ | ------------------------------------------------ |
+| GET      | `/`                                                          | Redirects to this README                         |
+| GET      | `/.well-known/openid-configuration`                          | OIDC discovery (RS256)                           |
+| GET      | `/.well-known/jwks.json`                                     | Public signing keys                              |
+| GET/POST | `/challenge` — `key`, `aud`, optional `method=sign\|decrypt` | Issue a challenge                                |
+| POST     | `/token`                                                     | Redeem a challenge + Proof of Possession → Token |
+
+`/challenge` takes its params from the query string (`GET`) or a form-encoded
+body (`POST` — keeps the key out of the URL / access logs).
 
 `method` defaults to `sign` for SSH keys (works with `ssh-agent` and hardware
 keys) and is forced to `decrypt` for age keys. SSH keys may also use `decrypt`

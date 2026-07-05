@@ -77,6 +77,18 @@ Deno.test("/challenge responses are marked no-store (never cacheable)", async ()
   assertEquals(res.headers.get("cache-control"), "no-store");
 });
 
+Deno.test("POST /challenge accepts form-encoded params", async () => {
+  const res = await createHandler(await testConfig())(
+    new Request("https://popoidc.test/challenge", {
+      method: "POST",
+      body: new URLSearchParams({ key: sshPubLine(), aud: "octo-sts.dev" }),
+    }),
+  );
+  assertEquals(res.status, 200);
+  assertEquals(res.headers.get("cache-control"), "no-store");
+  assert((await res.text()).includes("."), "returns a challenge token");
+});
+
 Deno.test("/challenge requires key and aud", async () => {
   const res = await createHandler(await testConfig())(
     new Request("https://popoidc.test/challenge?aud=octo-sts.dev"),

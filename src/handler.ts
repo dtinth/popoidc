@@ -89,17 +89,17 @@ function identityOf(key: string): { sub: string; keyType: string } {
  */
 async function handleChallenge(
   cfg: Config,
-  url: URL,
+  params: URLSearchParams,
   now: () => number,
 ): Promise<Response> {
-  const key = url.searchParams.get("key");
-  const aud = url.searchParams.get("aud");
+  const key = params.get("key");
+  const aud = params.get("aud");
   if (!key || !aud) {
-    throw new HttpError(400, "key and aud query params are required");
+    throw new HttpError(400, "key and aud params are required");
   }
 
   const kind = keyKind(key);
-  const requested = url.searchParams.get("method");
+  const requested = params.get("method");
   const method: ProofMethod = kind === "age"
     ? "decrypt"
     : requested === "decrypt"
@@ -205,8 +205,14 @@ export function createHandler(
       if (req.method === "GET" && url.pathname === "/.well-known/jwks.json") {
         return json(jwksDocument([cfg.signingKey]));
       }
-      if (req.method === "GET" && url.pathname === "/challenge") {
-        return await handleChallenge(cfg, url, now);
+      if (
+        url.pathname === "/challenge" &&
+        (req.method === "GET" || req.method === "POST")
+      ) {
+        const params = req.method === "POST"
+          ? new URLSearchParams(await readBody(req, MAX_BODY_BYTES))
+          : url.searchParams;
+        return await handleChallenge(cfg, params, now);
       }
       if (req.method === "POST" && url.pathname === "/token") {
         return await handleToken(cfg, req, now);
