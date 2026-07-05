@@ -100,8 +100,18 @@ Deno.test("/challenge rejects an invalid age recipient", async () => {
 });
 
 Deno.test("/token requires a challenge", async () => {
-  const res = await createHandler(await testConfig())(postToken({}));
+  const res = await createHandler(await testConfig())(
+    new Request("https://popoidc.test/token", { method: "POST" }),
+  );
   assertEquals(res.status, 400);
+});
+
+Deno.test("/token rejects an oversized request body", async () => {
+  const body = "challenge=" + "x".repeat(20 * 1024);
+  const res = await createHandler(await testConfig())(
+    new Request("https://popoidc.test/token", { method: "POST", body }),
+  );
+  assertEquals(res.status, 413);
 });
 
 Deno.test("/token (sign) requires a signature", async () => {

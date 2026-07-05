@@ -38,6 +38,29 @@ function text(body: string): Response {
   });
 }
 
+/** Max accepted request body. A real /token body is < 1.5 KB; this is generous headroom. */
+const MAX_BODY_BYTES = 16 * 1024;
+
+/** Read a request body as text, aborting past `limit` bytes (streamed — Content-Length is not trusted). */
+async function readBody(req: Request, limit: number): Promise<string> {
+  const reader = req.body?.getReader();
+  if (!reader) return "";
+  const decoder = new TextDecoder();
+  let text = "";
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > limit) {
+      await reader.cancel();
+      throw new HttpError(413, "request body too large");
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
 /** Classify a supported public key by its string form. */
 function keyKind(key: string): "ssh-ed25519" | "age" {
   if (key.startsWith("ssh-ed25519 ")) return "ssh-ed25519";
@@ -109,7 +132,7 @@ async function handleToken(
   req: Request,
   now: () => number,
 ): Promise<Response> {
-  const body = new URLSearchParams(await req.text());
+  const body = new URLSearchParams(await readBody(req, MAX_BODY_BYTES));
   const challengeStr = body.get("challenge");
   if (!challengeStr) throw new HttpError(400, "challenge is required");
 
