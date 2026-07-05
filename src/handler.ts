@@ -32,9 +32,14 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+// Challenges and Tokens are single-use and time-bound — no cache (Cloudflare et al.)
+// may ever store them, or a stale challenge gets replayed and rejected as expired.
 function text(body: string): Response {
   return new Response(body, {
-    headers: { "content-type": "text/plain; charset=utf-8" },
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    },
   });
 }
 

@@ -69,6 +69,14 @@ Deno.test("GET / redirects to the GitHub readme", async () => {
   );
 });
 
+Deno.test("/challenge responses are marked no-store (never cacheable)", async () => {
+  const url = "https://popoidc.test/challenge?key=" +
+    encodeURIComponent(sshPubLine()) + "&aud=octo-sts.dev";
+  const res = await createHandler(await testConfig())(new Request(url));
+  assertEquals(res.status, 200);
+  assertEquals(res.headers.get("cache-control"), "no-store");
+});
+
 Deno.test("/challenge requires key and aud", async () => {
   const res = await createHandler(await testConfig())(
     new Request("https://popoidc.test/challenge?aud=octo-sts.dev"),
