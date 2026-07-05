@@ -1,5 +1,6 @@
 import { decodeBase64, encodeBase64 } from "@std/encoding/base64";
 import { sha256 } from "@noble/hashes/sha2.js";
+import { Reader } from "./sshwire.ts";
 
 /** A parsed `ssh-ed25519` public key. */
 export interface SshEd25519Key {
@@ -9,16 +10,6 @@ export interface SshEd25519Key {
   ed25519: Uint8Array;
   /** Free-text comment (may be empty). */
   comment: string;
-}
-
-/** Read a length-prefixed SSH wire string, returning its bytes and the next offset. */
-function readString(buf: Uint8Array, offset: number): [Uint8Array, number] {
-  if (offset + 4 > buf.length) throw new Error("ssh wire: truncated length");
-  const len = new DataView(buf.buffer, buf.byteOffset + offset, 4).getUint32(0);
-  const start = offset + 4;
-  const end = start + len;
-  if (end > buf.length) throw new Error("ssh wire: truncated string");
-  return [buf.subarray(start, end), end];
 }
 
 /** Parse an `ssh-ed25519 AAAA... [comment]` public key line. Throws on anything else. */
@@ -35,13 +26,13 @@ export function parseSshEd25519(line: string): SshEd25519Key {
     throw new Error("invalid base64 in ssh public key");
   }
 
-  const [algo, afterAlgo] = readString(wire, 0);
-  if (new TextDecoder().decode(algo) !== "ssh-ed25519") {
+  const r = new Reader(wire);
+  if (new TextDecoder().decode(r.readString()) !== "ssh-ed25519") {
     throw new Error("wire key type mismatch");
   }
-  const [pub, end] = readString(wire, afterAlgo);
+  const pub = r.readString();
   if (pub.length !== 32) throw new Error("ed25519 public key must be 32 bytes");
-  if (end !== wire.length) throw new Error("trailing bytes in ssh public key");
+  if (!r.done) throw new Error("trailing bytes in ssh public key");
 
   return { wire, ed25519: pub, comment: rest.join(" ") };
 }
