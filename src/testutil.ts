@@ -63,6 +63,29 @@ export function sshKeygen(args: string[], cwd: string): Promise<Uint8Array> {
   return run("ssh-keygen", args, { cwd });
 }
 
+/** Generate a native age identity; return the identity file path and its `age1…` recipient. */
+export async function genAgeIdentity(
+  dir: string,
+  name = "agekey.txt",
+): Promise<{ identityFile: string; recipient: string }> {
+  await run("age-keygen", ["-o", name], { cwd: dir });
+  const recipient = new TextDecoder().decode(
+    await run("age-keygen", ["-y", name], { cwd: dir }),
+  )
+    .trim();
+  return { identityFile: `${dir}/${name}`, recipient };
+}
+
+/** Decrypt an armored age file with the real `age` binary using `identityFile`. */
+export function ageDecrypt(
+  identityFile: string,
+  armored: string,
+): Promise<Uint8Array> {
+  return run("age", ["-d", "-i", identityFile], {
+    stdin: new TextEncoder().encode(armored),
+  });
+}
+
 /** Generate an ed25519 keypair `<name>`/`<name>.pub` in `dir`; return the public line. */
 export async function genEd25519(
   dir: string,
