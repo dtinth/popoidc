@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+#
+# sshid pre-commit hook.
+#
+#   1. Auto-formats the tree (deno fmt) and re-stages what was already staged.
+#   2. Blocks the commit on ANY deno fmt/lint/type/test problem.
+#
+# Effect: every commit is formatted, warning-free, and green ("commit on every
+# green" — a red or lint-dirty tree simply cannot be committed).
+#
+# Installed via `git config core.hooksPath .githooks`, so it is version-controlled.
+
+set -euo pipefail
+
+echo "pre-commit → deno fmt (auto-fix)"
+staged="$(git diff --cached --name-only --diff-filter=ACMR || true)"
+deno fmt
+# Re-stage files that were already staged so the formatting lands in this commit.
+if [ -n "$staged" ]; then
+  printf '%s\n' "$staged" | tr '\n' '\0' | xargs -0 -r git add --
+fi
+
+echo "pre-commit → deno fmt --check"
+deno fmt --check
+
+echo "pre-commit → deno lint"
+deno lint
+
+echo "pre-commit → deno check ."
+deno check .
+
+echo "pre-commit → deno test -A"
+deno test -A
+
+echo "pre-commit → all green ✓"
