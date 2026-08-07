@@ -9,6 +9,13 @@ export interface Config {
   namespace: string;
   /** Secret keying the challenge HMAC. */
   hmacSecret: Uint8Array;
+  /**
+   * Pepper deriving HMAC-mode Secret Fingerprints. Optional: leaving it unset
+   * disables HMAC mode entirely. Kept apart from `hmacSecret` because that one is
+   * rotatable at will (it only invalidates in-flight challenges) whereas this one
+   * *names* every Shared Secret Identity — changing it renames all of them.
+   */
+  hmacIdentitySecret?: Uint8Array;
   /** The RSA key Tokens are signed with. */
   signingKey: SigningKey;
 }
@@ -26,16 +33,18 @@ function required(env: EnvSource, key: string): string {
 
 /**
  * Load configuration from the environment:
- *   POPOIDC_ISSUER      public issuer URL
- *   POPOIDC_SIGNING_JWK RSA private JWK (JSON) with a `kid`
- *   POPOIDC_HMAC_SECRET challenge HMAC secret
- *   POPOIDC_NAMESPACE   optional SSHSIG namespace (default "popoidc")
+ *   POPOIDC_ISSUER               public issuer URL
+ *   POPOIDC_SIGNING_JWK          RSA private JWK (JSON) with a `kid`
+ *   POPOIDC_HMAC_SECRET          challenge HMAC secret
+ *   POPOIDC_HMAC_IDENTITY_SECRET optional identity pepper; enables HMAC mode
+ *   POPOIDC_NAMESPACE            optional SSHSIG namespace (default "popoidc")
  */
 export async function loadConfig(env: EnvSource = Deno.env): Promise<Config> {
   const issuer = required(env, "POPOIDC_ISSUER").replace(/\/+$/, "");
   const hmacSecret = new TextEncoder().encode(
     required(env, "POPOIDC_HMAC_SECRET"),
   );
+  const identitySecret = env.get("POPOIDC_HMAC_IDENTITY_SECRET");
   const namespace = env.get("POPOIDC_NAMESPACE") ?? "popoidc";
 
   let jwk: JWK & { kid?: string };
@@ -64,6 +73,9 @@ export async function loadConfig(env: EnvSource = Deno.env): Promise<Config> {
     issuer,
     namespace,
     hmacSecret,
+    hmacIdentitySecret: identitySecret
+      ? new TextEncoder().encode(identitySecret)
+      : undefined,
     signingKey: { kid: jwk.kid, privateKey, publicJwk },
   };
 }
