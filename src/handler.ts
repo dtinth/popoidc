@@ -10,6 +10,7 @@ import {
 import { parseSshEd25519, sshFingerprint } from "./sshkey.ts";
 import { verifySshsig } from "./sshsig.ts";
 import { encryptToRecipient } from "./agecrypt.ts";
+import { MIN_SECRET_LENGTH, secretFingerprint } from "./hmacid.ts";
 
 export interface HandlerOptions {
   /** Injectable clock (unix seconds) for tests. */
@@ -131,19 +132,28 @@ async function handleChallenge(
   }
 }
 
-/** POST /token — verify a challenge + its Proof of Possession, then mint a Token. */
-async function handleToken(
-  cfg: Config,
-  req: Request,
-  now: () => number,
-): Promise<Response> {
-  const body = new URLSearchParams(await readBody(req, MAX_BODY_BYTES));
-  const challengeStr = body.get("challenge");
-  if (!challengeStr) throw new HttpError(400, "challenge is required");
+/** A proven Identity, ready to be minted into a Token. */
+interface Grant {
+  sub: string;
+  keyType: string;
+  /** The `key` claim — the raw public key, or the fingerprint when there is no public half. */
+  key: string;
+  aud: string;
+}
 
+/**
+ * The Challenge grant: verify a Challenge + its Proof of Possession (Signing or
+ * Decryption) and report the Identity it proves.
+ */
+function grantFromChallenge(
+  cfg: Config,
+  body: URLSearchParams,
+  challengeStr: string,
+  nowSeconds: number,
+): Grant {
   let challenge: Challenge;
   try {
-    challenge = verifyChallenge(challengeStr, cfg.hmacSecret, now());
+    challenge = verifyChallenge(challengeStr, cfg.hmacSecret, nowSeconds);
   } catch {
     throw new HttpError(401, "invalid or expired challenge");
   }
@@ -168,12 +178,66 @@ async function handleToken(
   }
 
   const { sub, keyType } = identityOf(challenge.key);
+  return { sub, keyType, key: challenge.key, aud: challenge.aud };
+}
+
+/**
+ * The HMAC-mode grant (Disclosure Proof): the caller hands over the Shared Secret
+ * itself, so there is nothing to challenge — the request body *is* the proof, and
+ * a round-trip would add ceremony but no security. The Identity is the peppered
+ * HMAC of the secret; the Issuer neither stores the secret nor puts it in the Token.
+ */
+function grantFromSecret(
+  cfg: Config,
+  body: URLSearchParams,
+  secret: string,
+): Grant {
+  if (!cfg.hmacIdentitySecret) {
+    throw new HttpError(501, "hmac mode is not enabled on this issuer");
+  }
+  const aud = body.get("aud");
+  if (!aud) throw new HttpError(400, "aud is required with secret");
+  if (secret.length < MIN_SECRET_LENGTH) {
+    throw new HttpError(
+      400,
+      `secret must be at least ${MIN_SECRET_LENGTH} characters`,
+    );
+  }
+
+  // No public half exists, so `key` restates the fingerprint rather than leaking
+  // the secret it was derived from.
+  const sub = secretFingerprint(secret, cfg.hmacIdentitySecret);
+  return { sub, keyType: "hmac", key: sub, aud };
+}
+
+/** POST /token — take a proof of possession (Challenge-bound or disclosed) and mint a Token. */
+async function handleToken(
+  cfg: Config,
+  req: Request,
+  now: () => number,
+): Promise<Response> {
+  const body = new URLSearchParams(await readBody(req, MAX_BODY_BYTES));
+  const challengeStr = body.get("challenge");
+  const secret = body.get("secret");
+  if (challengeStr && secret) {
+    throw new HttpError(400, "send either challenge or secret, not both");
+  }
+
+  let grant: Grant;
+  if (secret) {
+    grant = grantFromSecret(cfg, body, secret);
+  } else if (challengeStr) {
+    grant = grantFromChallenge(cfg, body, challengeStr, now());
+  } else {
+    throw new HttpError(400, "challenge or secret is required");
+  }
+
   const jwt = await mintToken({
     issuer: cfg.issuer,
-    subject: sub,
-    audience: challenge.aud,
-    key: challenge.key,
-    keyType,
+    subject: grant.sub,
+    audience: grant.aud,
+    key: grant.key,
+    keyType: grant.keyType,
     signingKey: cfg.signingKey,
     nowSeconds: now(),
   });

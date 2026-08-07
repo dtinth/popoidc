@@ -11,14 +11,29 @@ identity.
 the keys to verify them. _Avoid_: OP, IdP, auth server (all correct in
 spec-speak, but we say Issuer).
 
-**Identity**: A public key held by a requester, of a supported type. Named by
-its **Key Fingerprint**. Types: an SSH key (ed25519) proven by **Signing
-Proof**; an age/X25519 recipient proven by **Decryption Proof**. _Avoid_:
-account, user, principal, "SSH Identity" (too narrow now).
+**Identity**: A secret held by a requester, of a supported type, named by its
+**Key Fingerprint**. Usually the private half of a public key: an SSH key
+(ed25519) proven by **Signing Proof**; an age/X25519 recipient proven by
+**Decryption Proof**. Or a **Shared Secret** with no public half at all, proven
+by **Disclosure Proof**. _Avoid_: account, user, principal, "SSH Identity" (too
+narrow now).
+
+**Shared Secret**: An arbitrary high-entropy string (≥ 16 chars) the requester
+invents and hands to the Issuer verbatim — "HMAC mode". No key material, no
+challenge, one request. Named by the HMAC of the secret under a server-side
+**Identity Pepper**, so the Issuer stores nothing and the name discloses
+nothing. _Avoid_: password, API key, token (it is none of those to a Relying
+Party).
+
+**Identity Pepper**: The server-side secret (`POPOIDC_HMAC_IDENTITY_SECRET`)
+that keys Shared Secret naming. Deliberately _not_ the challenge HMAC secret:
+that one is rotatable at will, this one is permanent — rotating it renames every
+Shared Secret Identity at once. Unset by default, which disables HMAC mode.
 
 **Key Fingerprint**: The stable, per-type identifier that becomes the Token's
 `sub`. SSH keys → the OpenSSH `SHA256:<base64>` fingerprint (`ssh-keygen -lf`).
-age recipients → the `age1…` recipient string. Chosen for trust-policy
+age recipients → the `age1…` recipient string. Shared Secrets → the
+`HMAC-SHA256:<base64>` **Secret Fingerprint**. Chosen for trust-policy
 ergonomics. _Avoid_: key id, thumbprint, did.
 
 **Challenge**: A server-issued, stateless (HMAC-authenticated, never stored)
@@ -27,12 +42,14 @@ target public key. The uniform carrier of audience/freshness binding across all
 key types. Redeemed at the token endpoint by returning a **Proof of Possession**
 over it. _Avoid_: nonce (it contains one, but is more), session.
 
-**Proof of Possession**: The response only the private key can produce for a
-given **Challenge**. Two methods: **Signing Proof** (sign the Challenge —
+**Proof of Possession**: What only the holder of an Identity can produce. Three
+methods. Two are **Challenge**-bound, because public keys are public and a Token
+would otherwise be worthless: **Signing Proof** (sign the Challenge —
 signing-capable keys, via SSHSIG with namespace `popoidc`) and **Decryption
 Proof** (decrypt a secret the Challenge encrypted to the public key —
-encryption-only keys like age). Required because public keys are public; without
-it a Token is worthless. _Avoid_: authentication, login.
+encryption-only keys like age). The third, **Disclosure Proof**, needs no
+Challenge: the requester simply sends the **Shared Secret**, which nothing but
+possession can produce. _Avoid_: authentication, login.
 
 An SSH key may prove by **either** method (client picks via `?method=`):
 
@@ -53,9 +70,10 @@ fails. An age (X25519) key can only ever prove by Decryption Proof.
 
 **Token**: The signed JWT the Issuer produces. An OIDC ID Token in shape, signed
 RS256. Asserts only that the bearer controls a given Identity. Standard claims
-(`iss`/`sub`/`aud`/`iat`/`nbf`/`exp`/`jti`) plus `key` (raw public key) and
-`key_type`. Lives 15 min. No human-identity claims, by design. _Avoid_: id_token
-(in prose), credential, ticket.
+(`iss`/`sub`/`aud`/`iat`/`nbf`/`exp`/`jti`) plus `key` (raw public key — or, for
+a Shared Secret, which has no public half, the Secret Fingerprint again; never
+the secret itself) and `key_type`. Lives 15 min. No human-identity claims, by
+design. _Avoid_: id_token (in prose), credential, ticket.
 
 **Audience**: The `aud` the requester asks the Issuer to bind into the Challenge
 (and thus the Token), naming the Relying Party the Token is for (as with GitHub
@@ -81,6 +99,10 @@ if advertised) via coreos/go-oidc.
 - The **Issuer** mints one **Token**; its `sub` is the **Key Fingerprint**
 - A **Relying Party** verifies the **Token** and maps its Fingerprint to access
 
+**Shared Secret** short-circuits the first three steps: the requester posts the
+secret and the Audience straight to the token endpoint, and the **Issuer** mints
+the **Token** — there is nothing for a Challenge to bind.
+
 ## Motivating scenario
 
 A devbox holds an ed25519 SSH Identity. It requests a Challenge for
@@ -100,18 +122,27 @@ _who_ owns the devbox.
 
 ## Flagged ambiguities
 
-- "identity" is overloaded: **Identity** here means a public key, NOT a human.
+- "identity" is overloaded: **Identity** here means a key or secret, NOT a
+  human.
 - "SSH Identity (ed25519)" was too narrow — generalized to **Identity** (SSH
-  signing _or_ age decryption) once **Decryption Proof** entered the design.
+  signing _or_ age decryption) once **Decryption Proof** entered the design, and
+  again ("a public key" → "a secret") once **Shared Secret** did.
+- "HMAC" now names two unrelated things: the **Challenge**'s MAC and the
+  **Shared Secret** mode's naming function. They use different secrets on
+  purpose (see **Identity Pepper**) — never conflate them.
 
 ## Scope (v1)
 
 - Signing Proof: `ssh-ed25519`. Decryption Proof: native age `age1…` (X25519)
   and on-disk `ssh-ed25519`. So the Issuer encrypts to both `age1…` and
   `ssh-ed25519` recipients. `ssh-rsa`/`ecdsa`/`sk-ssh-ed25519` (sign-only) are
-  future additions behind the same Challenge envelope.
+  future additions behind the same Challenge envelope. Disclosure Proof: any
+  string ≥ 16 chars.
 - `/challenge?key=…&aud=…&method=sign|decrypt`; `method` defaults to `sign` for
   SSH keys, is forced to `decrypt` for age keys.
+- `POST /token` takes `challenge` (+ `signature` for Signing Proof) **or**
+  `secret` + `aud` (Disclosure Proof), never both. HMAC mode is off unless the
+  operator sets an **Identity Pepper**.
 - Runtime: Deno 2.9 (Node-compat). Libraries: `jose` (RS256 JWT + JWKS),
   `age-encryption`/typage (X25519 encrypt). SSHSIG verify is hand-rolled on Deno
   WebCrypto (`crypto.subtle` Ed25519). Built test-first (heavy TDD).

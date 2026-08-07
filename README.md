@@ -4,14 +4,14 @@
 [![Coverage & test report](https://img.shields.io/badge/report-gh--pages-2563eb)](https://dtinth.github.io/popoidc/)
 
 A public, self-hosted **OIDC-compatible token issuer** that mints short-lived
-JWTs asserting _only_ that the bearer controls a given public key — "GitHub
+JWTs asserting _only_ that the bearer controls a given key or secret — "GitHub
 Actions OIDC, but the auth factor is a key you already own."
 
-Prove possession of an `ssh-ed25519` key (by signing) or a native `age`/X25519
-key (by decrypting), and receive an RS256 ID Token whose `sub` is the key's
-fingerprint. Relying parties verify it via standard OIDC discovery + JWKS and
-decide for themselves whether that key is authorized — popoidc never asserts a
-human identity.
+Prove possession of an `ssh-ed25519` key (by signing), a native `age`/X25519 key
+(by decrypting), or a plain shared secret (by disclosing it — "HMAC mode"), and
+receive an RS256 ID Token whose `sub` is that identity's fingerprint. Relying
+parties verify it via standard OIDC discovery + JWKS and decide for themselves
+whether that fingerprint is authorized — popoidc never asserts a human identity.
 
 The design and the decisions behind it live in [CONTEXT.md](./CONTEXT.md) and
 [docs/adr/](./docs/adr/).
@@ -32,6 +32,7 @@ your own (see [Deploy](#deploy)).
 | GET      | `/.well-known/jwks.json`                                     | Public signing keys                              |
 | GET/POST | `/challenge` — `key`, `aud`, optional `method=sign\|decrypt` | Issue a challenge                                |
 | POST     | `/token`                                                     | Redeem a challenge + Proof of Possession → Token |
+| POST     | `/token` — `secret`, `aud`                                   | HMAC mode: disclose a shared secret → Token      |
 
 `/challenge` takes its params from the query string (`GET`) or a form-encoded
 body (`POST` — keeps the key out of the URL / access logs).
@@ -64,6 +65,38 @@ TOKEN=$(curl -sG "$ISS/challenge" --data-urlencode "key=$KEY" --data-urlencode "
 echo "$TOKEN"
 ```
 
+### Disclosure Proof (HMAC mode — a shared secret, no key at all)
+
+Requires the Issuer to have `POPOIDC_HMAC_IDENTITY_SECRET` set (see
+[Configuration](#configuration)); otherwise `/token` answers `501`.
+
+```bash
+ISS=https://popoidc.example
+SECRET="$(cat ~/.config/popoidc/secret)"    # generate: openssl rand -base64 24
+TOKEN=$(curl -s "$ISS/token" --data-urlencode "secret=$SECRET" --data-urlencode "aud=octo-sts.dev")
+echo "$TOKEN"
+```
+
+One request, no challenge round-trip: the secret _is_ the proof, so binding it
+to a server-issued challenge would add ceremony but no security. The `sub` is
+`HMAC-SHA256:<base64>` — HMAC-SHA256 of your secret under a server-side pepper —
+so it is stable for a given secret, reveals nothing about it, and differs across
+Issuers. Decode the returned Token to read the `sub` you need for a trust
+policy.
+
+Secrets must be at least 16 characters. The pepper stops _offline_ guessing, but
+anyone may ask the Issuer to mint a Token for a _guessed_ secret, so use a
+random one (`openssl rand -base64 24`) — never a password you use elsewhere.
+
+**The trade-off:** unlike the other two modes, the secret leaves the client and
+is seen by the Issuer. That is a real cost, and it buys the simplest possible
+client — no key, no signing, no `age`, one `curl`. It does not widen the trust
+model much: a relying party already trusts the Issuer to mint identities, and
+the Issuer already holds the signing key, so it could always impersonate you to
+that relying party. What it _does_ add is that a compromised Issuer learns the
+secret itself — which is why the secret must be dedicated to popoidc and used
+nowhere else.
+
 ## Using it with octo-sts
 
 Point a trust policy (`.github/chainguard/<name>.sts.yaml` in the target
@@ -85,7 +118,13 @@ All configuration is via environment variables (see
 
 - `POPOIDC_ISSUER` — public HTTPS issuer URL (equals `iss`).
 - `POPOIDC_SIGNING_JWK` — RSA private JWK with a `kid` (`deno task keygen`).
-- `POPOIDC_HMAC_SECRET` — secret for the challenge HMAC.
+- `POPOIDC_HMAC_SECRET` — secret for the challenge HMAC. Rotate freely; it only
+  invalidates challenges in flight.
+- `POPOIDC_HMAC_IDENTITY_SECRET` — optional pepper for HMAC-mode fingerprints.
+  Unset (the default) disables HMAC mode. **Do not rotate it**: it _names_ every
+  shared-secret identity, so changing it renames all of them at once and breaks
+  every trust policy pointing at one. Kept separate from `POPOIDC_HMAC_SECRET`
+  for exactly that reason.
 - `POPOIDC_NAMESPACE` — optional SSHSIG namespace (default `popoidc`).
 - `PORT` — optional (default `8000`).
 

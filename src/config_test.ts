@@ -28,6 +28,17 @@ Deno.test("loadConfig builds a Config from env and derives a public-only JWK", a
     cfg.signingKey.publicJwk.d === undefined,
     "must not expose private key",
   );
+  assertEquals(cfg.hmacIdentitySecret, undefined); // HMAC mode is opt-in
+});
+
+Deno.test("loadConfig enables HMAC mode when an identity pepper is set", async () => {
+  const cfg = await loadConfig(fakeEnv({
+    POPOIDC_ISSUER: "https://popoidc.example",
+    POPOIDC_SIGNING_JWK: await privateJwkJson("k1"),
+    POPOIDC_HMAC_SECRET: "supersecret",
+    POPOIDC_HMAC_IDENTITY_SECRET: "pepper",
+  }));
+  assertEquals(cfg.hmacIdentitySecret, new TextEncoder().encode("pepper"));
 });
 
 Deno.test("loadConfig requires POPOIDC_ISSUER", async () => {

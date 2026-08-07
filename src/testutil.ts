@@ -13,6 +13,7 @@ export async function testConfig(
     issuer: "https://popoidc.test",
     namespace: "popoidc",
     hmacSecret: new TextEncoder().encode("test-hmac-secret"),
+    hmacIdentitySecret: new TextEncoder().encode("test-identity-pepper"),
     signingKey: await testSigningKey(),
     ...overrides,
   };
