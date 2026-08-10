@@ -2,9 +2,12 @@
 
 ## Communication
 
-**Discuss in ASD-STE100 (Simplified Technical English).** This applies to
-conversation in the terminal: answers, questions, explanations, and design
-discussion.
+**Discuss in ASD-STE100 (Simplified Technical English).** This applies to:
+
+- conversation in the terminal — answers, questions, explanations, and design
+  discussion;
+- pull request titles and descriptions;
+- comments on pull requests and issues.
 
 Follow the STE writing rules:
 
@@ -20,9 +23,10 @@ Follow the STE writing rules:
 - Use approved, common words. Write "use", not "utilize". Write "get", not
   "obtain". Write "before", not "prior to".
 
-Repository prose keeps its existing voice. `README.md`, `CONTEXT.md`, and the
-ADRs in `docs/adr/` are written in full English, and new documents must agree
-with them. The STE rule is for discussion, not for the repository.
+Repository prose keeps its existing voice. `README.md`, `CONTEXT.md`, the ADRs
+in `docs/adr/`, and commit messages are written in full English, and new
+documents must agree with them. The STE rule is for discussion and for what you
+write on GitHub, not for files in the repository.
 
 ## Project
 
