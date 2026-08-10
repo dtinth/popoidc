@@ -25,6 +25,20 @@ challenge, one request. Named by the HMAC of the secret under a server-side
 nothing. _Avoid_: password, API key, token (it is none of those to a Relying
 Party).
 
+**Harness**: The agent runtime that holds an MCP connector — a Claude harness,
+say. It authorizes once over OAuth; the platform stores the resulting access
+token and attaches it to each MCP request, so the model never reads it. That
+access token _is_ a **Shared Secret**, which makes the connector a vault rather
+than an authorization. Named per **Namespace**. Note the granularity: the
+Identity belongs to the Harness, so every agent session on it shares one `sub`.
+_Avoid_: agent, session, worker (all narrower than what is actually named).
+
+**Namespace**: A path segment on the MCP endpoint (`/mcp/ns1`), mixed into the
+Shared Secret so one access token names several Identities. A human sets it in
+the connector URL, which is the point — it must never be a tool argument, or a
+prompt-injected model could choose which Identity to act as. It is a rotation
+lever, not a privilege boundary. _Avoid_: scope, tenant, environment.
+
 **Identity Pepper**: The server-side secret (`POPOIDC_HMAC_IDENTITY_SECRET`)
 that keys Shared Secret naming. Deliberately _not_ the challenge HMAC secret:
 that one is rotatable at will, this one is permanent — rotating it renames every
@@ -143,6 +157,9 @@ _who_ owns the devbox.
 - `POST /token` takes `challenge` (+ `signature` for Signing Proof) **or**
   `secret` + `aud` (Disclosure Proof), never both. HMAC mode is off unless the
   operator sets an **Identity Pepper**.
+- Harness identity rides on HMAC mode: an OAuth authorization server at
+  `/oauth/*` mints the Shared Secret, and an MCP server at `/mcp[/<namespace>]`
+  redeems it. Both are off without an Identity Pepper. See ADR-0004.
 - Runtime: Deno 2.9 (Node-compat). Libraries: `jose` (RS256 JWT + JWKS),
   `age-encryption`/typage (X25519 encrypt). SSHSIG verify is hand-rolled on Deno
   WebCrypto (`crypto.subtle` Ed25519). Built test-first (heavy TDD).

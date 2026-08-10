@@ -1,5 +1,10 @@
 import type { Config } from "./config.ts";
-import { discoveryDocument, jwksDocument, mintToken } from "./token.ts";
+import {
+  discoveryDocument,
+  jwksDocument,
+  mintToken,
+  protectedResourceMetadata,
+} from "./token.ts";
 import {
   type Challenge,
   issueChallenge,
@@ -10,11 +15,17 @@ import {
 import { parseSshEd25519, sshFingerprint } from "./sshkey.ts";
 import { verifySshsig } from "./sshsig.ts";
 import { encryptToRecipient } from "./agecrypt.ts";
-import { MIN_SECRET_LENGTH, secretFingerprint } from "./hmacid.ts";
+import { hmacIdentity, MIN_SECRET_LENGTH } from "./hmacid.ts";
+import type { Fetcher } from "./cimd.ts";
+import { handleAuthorize, handleOAuthToken } from "./oauth.ts";
+import { handleMcp } from "./mcp.ts";
+import { mcpPath, parseMcpPath } from "./harness.ts";
 
 export interface HandlerOptions {
   /** Injectable clock (unix seconds) for tests. */
   now?: () => number;
+  /** Injectable fetch for Client ID Metadata Documents, so tests stay offline. */
+  fetcher?: Fetcher;
 }
 
 /** An error carrying an HTTP status code. */
@@ -204,10 +215,7 @@ function grantFromSecret(
     );
   }
 
-  // No public half exists, so `key` restates the fingerprint rather than leaking
-  // the secret it was derived from.
-  const sub = secretFingerprint(secret, cfg.hmacIdentitySecret);
-  return { sub, keyType: "hmac", key: sub, aud };
+  return { ...hmacIdentity(secret, cfg.hmacIdentitySecret), aud };
 }
 
 /** POST /token — take a proof of possession (Challenge-bound or disclosed) and mint a Token. */
@@ -268,6 +276,50 @@ export function createHandler(
       }
       if (req.method === "GET" && url.pathname === "/.well-known/jwks.json") {
         return json(jwksDocument([cfg.signingKey]));
+      }
+      // The same document at the OAuth path: a client tries both, in its own order.
+      if (
+        req.method === "GET" &&
+        url.pathname === "/.well-known/oauth-authorization-server"
+      ) {
+        return json(discoveryDocument(cfg.issuer));
+      }
+      if (
+        req.method === "GET" &&
+        url.pathname.startsWith("/.well-known/oauth-protected-resource/")
+      ) {
+        const resource = parseMcpPath(
+          url.pathname.slice("/.well-known/oauth-protected-resource".length),
+        );
+        if (resource) {
+          return json(
+            protectedResourceMetadata(cfg.issuer, mcpPath(resource.namespace)),
+          );
+        }
+      }
+      if (req.method === "GET" && url.pathname === "/oauth/authorize") {
+        return await handleAuthorize(cfg, url, now, opts.fetcher);
+      }
+      if (req.method === "POST" && url.pathname === "/oauth/token") {
+        return await handleOAuthToken(
+          cfg,
+          new URLSearchParams(await readBody(req, MAX_BODY_BYTES)),
+          now,
+        );
+      }
+      const mcp = parseMcpPath(url.pathname);
+      if (mcp) {
+        // Stateless: one JSON-RPC message per POST, and no SSE stream to GET.
+        if (req.method !== "POST") {
+          return json({ error: "method_not_allowed" }, 405);
+        }
+        return await handleMcp(
+          cfg,
+          await readBody(req, MAX_BODY_BYTES),
+          req.headers.get("authorization"),
+          mcp.namespace,
+          now,
+        );
       }
       if (
         url.pathname === "/challenge" &&
