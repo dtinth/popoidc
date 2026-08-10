@@ -33,3 +33,16 @@ export function secretFingerprint(secret: string, pepper: Uint8Array): string {
   return "HMAC-SHA256:" +
     encodeBase64(hmac(sha256, subkey, enc.encode(secret))).replace(/=+$/, "");
 }
+
+/**
+ * The Token claims naming a Shared Secret Identity. A Shared Secret has no public
+ * half, so `key` restates the fingerprint rather than disclosing the secret.
+ * Shared by the HMAC-mode grant and the MCP harness tools, so the rule lives once.
+ */
+export function hmacIdentity(
+  secret: string,
+  pepper: Uint8Array,
+): { sub: string; keyType: string; key: string } {
+  const sub = secretFingerprint(secret, pepper);
+  return { sub, keyType: "hmac", key: sub };
+}

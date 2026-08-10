@@ -28,11 +28,14 @@ your own (see [Deploy](#deploy)).
 | Method   | Path                                                         | Purpose                                          |
 | -------- | ------------------------------------------------------------ | ------------------------------------------------ |
 | GET      | `/`                                                          | Redirects to this README                         |
-| GET      | `/.well-known/openid-configuration`                          | OIDC discovery (RS256)                           |
+| GET      | `/.well-known/openid-configuration`                          | Discovery — also served at the OAuth path        |
 | GET      | `/.well-known/jwks.json`                                     | Public signing keys                              |
 | GET/POST | `/challenge` — `key`, `aud`, optional `method=sign\|decrypt` | Issue a challenge                                |
 | POST     | `/token`                                                     | Redeem a challenge + Proof of Possession → Token |
 | POST     | `/token` — `secret`, `aud`                                   | HMAC mode: disclose a shared secret → Token      |
+| GET      | `/oauth/authorize`                                           | Harness identity: mint a secret, redirect        |
+| POST     | `/oauth/token`                                               | Harness identity: OAuth token endpoint           |
+| POST     | `/mcp`, `/mcp/<namespace>`                                   | Harness identity: the MCP tools                  |
 
 `/challenge` takes its params from the query string (`GET`) or a form-encoded
 body (`POST` — keeps the key out of the URL / access logs).
@@ -97,6 +100,24 @@ that relying party. What it _does_ add is that a compromised Issuer learns the
 secret itself — which is why the secret must be dedicated to popoidc and used
 nowhere else.
 
+## Harness identity (for coding agents)
+
+A coding agent cannot hold a key, and a long-lived secret in its environment is
+reachable by the model, its tools and its logs. So popoidc also speaks MCP: add
+it to a Claude harness as a custom connector, click authorize, and the harness
+gets an identity whose secret lives in the platform's connector store — never in
+the context window, never in the environment.
+
+Two tools come with it. `get_harness_identity` reports the `sub` a trust policy
+must name; `create_harness_id_token` mints a Token for one relying party.
+Authorizing again produces a **new** identity, so a trust policy naming a
+harness must be updated after each reconnection.
+
+Requires `POPOIDC_HMAC_IDENTITY_SECRET`, since the identity is an HMAC-mode one.
+The protocol reference is
+[docs/harness-identity.md](./docs/harness-identity.md); the reasoning is in
+[ADR-0004](./docs/adr/0004-harness-identity-over-mcp.md).
+
 ## Using it with octo-sts
 
 Point a trust policy (`.github/chainguard/<name>.sts.yaml` in the target
@@ -121,7 +142,8 @@ All configuration is via environment variables (see
 - `POPOIDC_HMAC_SECRET` — secret for the challenge HMAC. Rotate freely; it only
   invalidates challenges in flight.
 - `POPOIDC_HMAC_IDENTITY_SECRET` — optional pepper for HMAC-mode fingerprints.
-  Unset (the default) disables HMAC mode. **Do not rotate it**: it _names_ every
+  Unset (the default) disables HMAC mode _and_ harness identity. **Do not rotate
+  it**: it _names_ every
   shared-secret identity, so changing it renames all of them at once and breaks
   every trust policy pointing at one. Kept separate from `POPOIDC_HMAC_SECRET`
   for exactly that reason.
