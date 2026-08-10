@@ -143,10 +143,9 @@ All configuration is via environment variables (see
   invalidates challenges in flight.
 - `POPOIDC_HMAC_IDENTITY_SECRET` — optional pepper for HMAC-mode fingerprints.
   Unset (the default) disables HMAC mode _and_ harness identity. **Do not rotate
-  it**: it _names_ every
-  shared-secret identity, so changing it renames all of them at once and breaks
-  every trust policy pointing at one. Kept separate from `POPOIDC_HMAC_SECRET`
-  for exactly that reason.
+  it**: it _names_ every shared-secret identity, so changing it renames all of
+  them at once and breaks every trust policy pointing at one. Kept separate from
+  `POPOIDC_HMAC_SECRET` for exactly that reason.
 - `POPOIDC_NAMESPACE` — optional SSHSIG namespace (default `popoidc`).
 - `PORT` — optional (default `8000`).
 
